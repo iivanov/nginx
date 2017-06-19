@@ -922,22 +922,16 @@ transparent:
     if (conf->filter == NGX_HTTP_IMAGE_RESIZE_FB) {
 
             int offset = 10;
+            ctx->max_width = ctx->max_height = 1080;
             int new_image_size_width = ctx->max_width + 2*offset;
             int new_image_size_height = ctx->max_height + 2*offset;
+            int max = (dx > dy) ? dx : dy;
 
-            if ((ngx_uint_t) dx > ctx->max_width) {
-                dy = dy * ctx->max_width / dx;
-                dy = dy ? dy : 1;
-                dx = ctx->max_width;
-            }
-
-            if ((ngx_uint_t) dy > ctx->max_height) {
-                dx = dx * ctx->max_height / dy;
-                dx = dx ? dx : 1;
-                dy = ctx->max_height;
-            }
+            dy = dy * ctx->max_width / max;
+            dx = dx * ctx->max_height / max;
 
             dst2 = ngx_http_image_new(r, dx, dy, palette);
+
             if (dst2 == NULL) {
                 gdImageDestroy(src);
                 return NULL;
