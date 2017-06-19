@@ -18,7 +18,7 @@
 #define NGX_HTTP_IMAGE_RESIZE    3
 #define NGX_HTTP_IMAGE_CROP      4
 #define NGX_HTTP_IMAGE_ROTATE    5
-
+#define NGX_HTTP_IMAGE_RESIZE_FB 6
 
 #define NGX_HTTP_IMAGE_START     0
 #define NGX_HTTP_IMAGE_READ      1
@@ -825,7 +825,7 @@ ngx_http_image_resize(ngx_http_request_t *r, ngx_http_image_filter_ctx_t *ctx)
     u_char                        *out;
     ngx_buf_t                     *b;
     ngx_uint_t                     resize;
-    gdImagePtr                     src, dst;
+    gdImagePtr                     src, dst, dst2;
     ngx_pool_cleanup_t            *cln;
     ngx_http_image_filter_conf_t  *conf;
 
@@ -919,7 +919,61 @@ transparent:
         }
     }
 
-    if (resize) {
+    if (conf->filter == NGX_HTTP_IMAGE_RESIZE_FB) {
+
+            int offset = 10;
+            int new_image_size_width = ctx->max_width + 2*offset;
+            int new_image_size_height = ctx->max_height + 2*offset;
+
+            if ((ngx_uint_t) dx > ctx->max_width) {
+                dy = dy * ctx->max_width / dx;
+                dy = dy ? dy : 1;
+                dx = ctx->max_width;
+            }
+
+            if ((ngx_uint_t) dy > ctx->max_height) {
+                dx = dx * ctx->max_height / dy;
+                dx = dx ? dx : 1;
+                dy = ctx->max_height;
+            }
+
+            dst2 = ngx_http_image_new(r, dx, dy, palette);
+            if (dst2 == NULL) {
+                gdImageDestroy(src);
+                return NULL;
+            }
+
+            gdImageCopyResampled(dst2, src, 0, 0, 0, 0, dx, dy, sx, sy);
+
+            gdImageDestroy(src);
+
+            dst = ngx_http_image_new(r, new_image_size_width, new_image_size_height, palette);
+
+            if (dst == NULL) {
+                gdImageDestroy(dst2);
+                return NULL;
+            }
+
+            gdImageFill(dst, 0, 0, gdImageColorAllocate(dst, 255, 255, 255));
+            gdImageCopy(
+                dst,
+                dst2,
+                (int)(new_image_size_width - dx) / 2,
+                (int)(new_image_size_height - dy) / 2,
+                0,
+                0,
+                dx,
+                dy
+            );
+
+            if (colors) {
+                gdImageTrueColorToPalette(dst, 1, 256);
+            }
+
+            gdImageDestroy(dst2);
+
+    } else if (resize) {
+
         dst = ngx_http_image_new(r, dx, dy, palette);
         if (dst == NULL) {
             gdImageDestroy(src);
@@ -1444,7 +1498,10 @@ ngx_http_image_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-    if (ngx_strcmp(value[i].data, "resize") == 0) {
+    if (ngx_strcmp(value[i].data, "fbresize") == 0) {
+        imcf->filter = NGX_HTTP_IMAGE_RESIZE_FB;
+
+    } else if (ngx_strcmp(value[i].data, "resize") == 0) {
         imcf->filter = NGX_HTTP_IMAGE_RESIZE;
 
     } else if (ngx_strcmp(value[i].data, "crop") == 0) {
