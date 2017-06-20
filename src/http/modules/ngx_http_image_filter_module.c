@@ -933,14 +933,7 @@ transparent:
             dx = sx * limit_size / max;
             max = limit_size;
 
-            dst2 = ngx_http_image_new(r, dx, dy, palette);
-            if (dst2 == NULL) {
-                gdImageDestroy(src);
-                return NULL;
-            }
-
-            gdImageCopyResampled(dst2, src, 0, 0, 0, 0, dx, dy, sx, sy);
-
+            dst2 = gdImageScale(src, dx, dy);
             gdImageDestroy(src);
         } else {
             dst2 = src;
